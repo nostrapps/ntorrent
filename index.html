@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nostr Torrent Browser — Torrents on Nostr</title>
+<meta name="description" content="Browse BitTorrent listings from the Nostr network via NIP-35">
+<meta property="og:title" content="Nostr Torrent Browser">
+<meta property="og:description" content="NIP-35 protocol demo. Browse torrent listings from Nostr relays. Read-only client built with LOSOS.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="og.svg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:image" content="og.svg">
+<meta property="og:site_name" content="ntorrent">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Nostr Torrent Browser — NIP-35 Demo">
+<style>
+* { margin: 0; box-sizing: border-box; }
+body { font-family: Verdana, Geneva, sans-serif; background: #f5f5f5; color: #333; font-size: 13px; }
+#losos { max-width: 100% !important; }
+#losos > div { max-width: 100% !important; width: 100% !important; }
+button.pane-tab { color: #ccc !important; font-weight: 400 !important; font-family: Verdana, Geneva, sans-serif !important; font-size: 12px !important; }
+button.pane-tab[aria-selected="true"] { color: #fff !important; font-weight: 700 !important; }
+#pane-tabs { background: #3b3b3b !important; border-bottom: none !important; }
+.nt-boot {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100vh; color: #999; font-size: 13px; gap: 14px;
+}
+.nt-boot-spinner {
+  width: 36px; height: 36px; border: 3px solid #ddd;
+  border-top-color: #5cb85c; border-radius: 50%;
+  animation: nt-spin 0.7s linear infinite;
+}
+@keyframes nt-spin { to { transform: rotate(360deg); } }
+::selection { background: #5cb85c; color: #fff; }
+a { color: #1a0dab; text-decoration: underline; }
+a:hover { color: #d9534f; }
+</style>
+</head>
+<body>
+<script src="https://unpkg.com/xlogin"></script>
+
+<div id="losos">
+  <div class="nt-boot">
+    <div class="nt-boot-spinner"></div>
+    <div id="nt-status">Connecting to Nostr relays...</div>
+  </div>
+</div>
+<div id="data" style="display:none"></div>
+
+<script type="module" data-pane src="panes/browse.js"></script>
+<script type="module" data-pane src="panes/publish.js"></script>
+<script type="module" data-pane src="panes/torrent.js"></script>
+<script type="module" data-pane src="panes/relays.js"></script>
+
+<script>
+(function() {
+  var dataEl = document.getElementById('data')
+  var statusEl = document.getElementById('nt-status')
+
+  var RELAYS = [
+    'wss://relay.nostr.band/',
+    'wss://nos.lol/',
+    'wss://relay.damus.io/'
+  ]
+
+  var DEFAULT_TRACKERS = [
+    'udp://tracker.opentrackr.org:1337',
+    'udp://tracker.openbittorrent.com:6969',
+    'udp://open.stealth.si:80',
+    'udp://tracker.torrent.eu.org:451'
+  ]
+
+  var context = {
+    "schema": "http://schema.org/",
+    "dct": "http://purl.org/dc/terms/",
+    "title": "dct:title",
+    "torrent": "schema:hasPart",
+    "name": "schema:name",
+    "infohash": "schema:identifier",
+    "desc": "schema:description",
+    "author": "schema:creator",
+    "created": "schema:dateCreated",
+    "files": "schema:associatedMedia",
+    "fileCount": "schema:numberOfItems",
+    "totalSize": "schema:contentSize",
+    "trackers": "schema:url",
+    "magnet": "schema:downloadUrl",
+    "categories": "schema:keywords",
+    "imdb": "schema:sameAs",
+    "tmdb": "schema:additionalType",
+    "tags": "schema:genre",
+    "eventId": "schema:serialNumber",
+    "relayData": "schema:provider",
+    "TorrentFeed": "schema:DataFeed",
+    "Torrent": "schema:MediaObject"
+  }
+
+  function formatSize(bytes) {
+    if (!bytes || bytes <= 0) return ''
+    if (bytes < 1024) return bytes + ' B'
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KiB'
+    if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MiB'
+    return (bytes / 1073741824).toFixed(2) + ' GiB'
+  }
+
+  function parseEvent(ev) {
+    if (ev.kind !== 2003) return null
+    var tags = ev.tags || []
+    var title = '', infohash = '', files = [], trackers = [], cats = [], extRefs = {}, totalSize = 0
+
+    tags.forEach(function(tag) {
+      if (tag[0] === 'title' && tag[1]) title = tag[1]
+      else if ((tag[0] === 'x' || tag[0] === 'btih') && tag[1]) infohash = tag[1]
+      else if (tag[0] === 'file' && tag[1]) {
+        var size = parseInt(tag[2]) || 0
+        files.push({ name: tag[1], size: size })
+        totalSize += size
+      }
+      else if (tag[0] === 'tracker' && tag[1]) trackers.push(tag[1])
+      else if (tag[0] === 't' && tag[1]) cats.push(tag[1])
+      else if (tag[0] === 'i' && tag[1]) {
+        var parts = tag[1].split(':')
+        var prefix = parts[0]
+        var val = parts.slice(1).join(':')
+        if (prefix === 'tcat') cats = cats.concat(val.split(','))
+        else extRefs[prefix] = val
+      }
+    })
+
+    if (!infohash) return null
+    var trk = trackers.length > 0 ? trackers : DEFAULT_TRACKERS
+    var magnet = 'magnet:?xt=urn:btih:' + infohash
+    if (title) magnet += '&dn=' + encodeURIComponent(title)
+    trk.forEach(function(t) { magnet += '&tr=' + encodeURIComponent(t) })
+
+    return {
+      "@id": "#t" + ev.id.slice(0, 12),
+      "@type": "Torrent",
+      "name": title || 'Untitled',
+      "infohash": infohash,
+      "desc": ev.content || '',
+      "author": ev.pubkey ? ev.pubkey.slice(0, 16) + '...' : '',
+      "created": (ev.created_at || 0) * 1000,
+      "files": files.map(function(f) { return f.name + ' (' + formatSize(f.size) + ')' }).join('\n'),
+      "fileCount": files.length,
+      "totalSize": totalSize,
+      "trackers": trk.join('\n'),
+      "magnet": magnet,
+      "categories": cats.filter(Boolean).join(', '),
+      "imdb": extRefs.imdb || '',
+      "tmdb": extRefs.tmdb || '',
+      "tags": cats.filter(Boolean).join(', '),
+      "eventId": ev.id
+    }
+  }
+
+  var seen = {}, torrents = [], connected = 0, eoseCount = 0, booted = false
+  var relayStats = {}
+  RELAYS.forEach(function(r) { relayStats[r] = { url: r, status: 'connecting', events: 0, unique: 0, dupes: 0, connectedAt: 0, eoseAt: 0, latencyMs: 0, errors: 0 } })
+
+  function boot() {
+    if (booted) return
+    booted = true
+    torrents.sort(function(a, b) { return (b.created || 0) - (a.created || 0) })
+    var relayArr = RELAYS.map(function(r) {
+      var s = relayStats[r]
+      return { url: s.url, status: s.status, events: s.events, unique: s.unique, dupes: s.dupes, latencyMs: s.latencyMs, errors: s.errors }
+    })
+    var jsonLd = { "@context": context, "@id": "#this", "@type": "TorrentFeed", "title": "Nostr Torrent Browser", "torrent": torrents, "relayData": JSON.stringify(relayArr) }
+    dataEl.textContent = JSON.stringify(jsonLd)
+    document.getElementById('losos').textContent = ''
+    var s = document.createElement('script')
+    s.type = 'module'
+    s.src = 'losos/shell.js'
+    document.body.appendChild(s)
+  }
+
+  function connectRelay(url) {
+    var ws, rs = relayStats[url], t0 = Date.now()
+    try { ws = new WebSocket(url) } catch(e) { rs.status = 'error'; rs.errors++; return }
+    ws.onopen = function() {
+      connected++
+      rs.status = 'connected'
+      rs.connectedAt = Date.now()
+      rs.latencyMs = Date.now() - t0
+      if (statusEl) statusEl.textContent = 'Connected to ' + connected + '/' + RELAYS.length + ' relays...'
+      ws.send(JSON.stringify(["REQ", "browse", { "kinds": [2003], "limit": 200 }]))
+    }
+    ws.onmessage = function(e) {
+      try {
+        var msg = JSON.parse(e.data)
+        if (msg[0] === 'EVENT' && msg[2]) {
+          rs.events++
+          if (!seen[msg[2].id]) {
+            seen[msg[2].id] = true
+            rs.unique++
+            var t = parseEvent(msg[2])
+            if (t) { torrents.push(t); if (statusEl) statusEl.textContent = torrents.length + ' torrents found...' }
+          } else { rs.dupes++ }
+        } else if (msg[0] === 'EOSE') {
+          rs.status = 'done'
+          rs.eoseAt = Date.now()
+          eoseCount++
+          if (eoseCount >= connected) boot()
+        }
+      } catch(err) {}
+    }
+    ws.onerror = function() { rs.status = 'error'; rs.errors++; eoseCount++; if (eoseCount >= RELAYS.length && !booted) boot() }
+    ws.onclose = function() { if (rs.status === 'connected') rs.status = 'closed'; if (!booted && eoseCount >= connected) boot() }
+    setTimeout(function() { if (!booted && torrents.length > 0) boot() }, 8000)
+  }
+
+  // Expose for panes
+  window.__NT_RELAYS = RELAYS
+  window.__NT_DEFAULT_TRACKERS = DEFAULT_TRACKERS
+
+  RELAYS.forEach(connectRelay)
+  setTimeout(function() {
+    if (!booted) {
+      if (torrents.length > 0) boot()
+      else { var el = document.querySelector('.nt-boot'); if (el) el.innerHTML = '<div>Could not connect to relays. <a href="" onclick="location.reload();return false">Retry</a></div>' }
+    }
+  }, 15000)
+})()
+</script>
+
+</body>
+</html>
