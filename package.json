@@ -5,15 +5,18 @@
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/nostrapps/ntorrent.git"
   },
+  "homepage": "https://nostrapps.github.io/ntorrent/",
   "keywords": [
     "nostr",
     "nip-35",
     "torrent",
     "losos",
     "linked-data",
-    "json-ld"
-  ],
-  "private": true
+    "json-ld",
+    "decentralized",
+    "bittorrent",
+    "magnet"
+  ]
 }
