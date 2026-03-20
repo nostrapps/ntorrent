@@ -47,11 +47,11 @@ export default {
 
       var totalEvents = 0, totalUnique = 0, totalDupes = 0
       relays.forEach(function(r) {
-        totalEvents += r.events || 0
+        totalEvents += (r.unique || 0) + (r.dupes || 0)
         totalUnique += r.unique || 0
         totalDupes += r.dupes || 0
       })
-      var maxEvents = Math.max.apply(null, relays.map(function(r) { return r.events || 0 })) || 1
+      var maxEvents = Math.max.apply(null, relays.map(function(r) { return (r.unique || 0) + (r.dupes || 0) })) || 1
 
       render(container, html`
         <div style="font-family:Verdana,Geneva,sans-serif;font-size:13px;background:#f5f5f5;min-height:100vh">
@@ -94,8 +94,8 @@ export default {
             <!-- Per-relay cards -->
             ${relays.map(function(r, i) {
               var s = statusSymbols[r.status] || statusSymbols.connecting
-              var eventPct = (r.events / maxEvents) * 100
-              var uniquePct = r.events > 0 ? Math.round((r.unique / r.events) * 100) : 0
+              var total = (r.unique || 0) + (r.dupes || 0)
+              var uniquePct = total > 0 ? Math.round((r.unique / total) * 100) : 0
               var shortUrl = r.url.replace('wss://', '').replace(/\/$/, '')
 
               return html`
@@ -105,7 +105,7 @@ export default {
                     <span style="font-size:16px">${s.icon}</span>
                     <div style="flex:1">
                       <div style="font-size:13px;font-weight:700;color:#333;font-family:Consolas,monospace">${shortUrl}</div>
-                      <div style="font-size:10px;color:${s.color};font-weight:700;margin-top:1px">${s.label}</div>
+                      <div style="${'font-size:10px;color:' + s.color + ';font-weight:700;margin-top:1px'}">${s.label}</div>
                     </div>
                     ${r.latencyMs ? html`<div style="font-size:10px;color:#888;text-align:right">${r.latencyMs}ms<br/><span style="color:#aaa">latency</span></div>` : ''}
                   </div>
@@ -115,7 +115,7 @@ export default {
                     <div style="display:flex;gap:20px;margin-bottom:8px">
                       <div>
                         <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#999;margin-bottom:2px">Events</div>
-                        <div style="font-size:18px;font-weight:700;color:#333">${r.events}</div>
+                        <div style="font-size:18px;font-weight:700;color:#333">${total}</div>
                       </div>
                       <div>
                         <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#999;margin-bottom:2px">Unique</div>
