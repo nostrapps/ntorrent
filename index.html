@@ -149,10 +149,10 @@ a:hover { color: #d9534f; }
       "totalSize": totalSize,
       "trackers": trk.join('\n'),
       "magnet": magnet,
-      "categories": cats.filter(Boolean).join(', '),
+      "categories": cats.filter(function(c, i, a) { return c && a.indexOf(c) === i }).join(', '),
       "imdb": extRefs.imdb || '',
       "tmdb": extRefs.tmdb || '',
-      "tags": cats.filter(Boolean).join(', '),
+      "tags": cats.filter(function(c, i, a) { return c && a.indexOf(c) === i }).join(', '),
       "eventId": ev.id
     }
   }
