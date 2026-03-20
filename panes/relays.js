@@ -1,6 +1,8 @@
 import { createStore } from '../losos/store.js'
 import { html, render, onUnmount } from '../losos/html.js'
 
+var STORAGE_KEY = 'ntorrent:relays'
+
 var statusSymbols = {
   done:       { icon: '\u2705', label: 'Connected', color: '#5cb85c' },
   connected:  { icon: '\u{1F7E1}', label: 'Receiving...', color: '#f0ad4e' },
@@ -10,7 +12,6 @@ var statusSymbols = {
 }
 
 function getRelays() {
-  // Read live stats if available, fall back to snapshot
   var stats = window.__NT_RELAY_STATS
   var relayUrls = window.__NT_RELAYS
   if (stats && relayUrls) {
@@ -21,6 +22,12 @@ function getRelays() {
   }
   return null
 }
+
+function getSavedRelays() {
+  try { var s = JSON.parse(localStorage.getItem(STORAGE_KEY)); return Array.isArray(s) ? s : null } catch(e) { return null }
+}
+
+function isCustom() { return getSavedRelays() !== null }
 
 export default {
   label: 'Relays',
@@ -37,6 +44,46 @@ export default {
     var store = createStore(data, { debounce: 500 })
     var root = store.get('#this')
     var pollTimer = null
+    var mgmt = { newUrl: '', dirty: false }
+
+    function getManagedList() {
+      return getSavedRelays() || (window.__NT_DEFAULT_RELAYS || window.__NT_RELAYS || []).slice()
+    }
+
+    function saveRelays(list) {
+      var defaults = window.__NT_DEFAULT_RELAYS || []
+      var same = list.length === defaults.length && list.every(function(u, i) { return u === defaults[i] })
+      if (same) {
+        localStorage.removeItem(STORAGE_KEY)
+      } else {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
+      }
+      mgmt.dirty = true
+      renderRelays()
+    }
+
+    function addRelay(url) {
+      url = url.trim()
+      if (!url) return
+      if (!url.startsWith('wss://')) url = 'wss://' + url
+      if (!url.endsWith('/')) url += '/'
+      var list = getManagedList()
+      if (list.indexOf(url) >= 0) return
+      list.push(url)
+      mgmt.newUrl = ''
+      saveRelays(list)
+    }
+
+    function removeRelay(url) {
+      var list = getManagedList().filter(function(u) { return u !== url })
+      saveRelays(list)
+    }
+
+    function resetDefaults() {
+      localStorage.removeItem(STORAGE_KEY)
+      mgmt.dirty = true
+      renderRelays()
+    }
 
     function renderRelays() {
       var relays = getRelays()
@@ -52,6 +99,9 @@ export default {
         totalDupes += r.dupes || 0
       })
       var maxEvents = Math.max.apply(null, relays.map(function(r) { return (r.unique || 0) + (r.dupes || 0) })) || 1
+
+      var managedList = getManagedList()
+      var custom = isCustom()
 
       render(container, html`
         <div style="font-family:Verdana,Geneva,sans-serif;font-size:13px;background:#f5f5f5;min-height:100vh">
@@ -147,6 +197,59 @@ export default {
                 </div>
               `
             })}
+
+            <!-- Relay Management -->
+            <div style="background:#fff;border:1px solid #ccc;padding:12px 14px;margin-top:12px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <div style="font-size:12px;font-weight:700;color:#333">Manage Relays</div>
+                ${custom ? html`<span style="font-size:9px;color:#f0ad4e;font-weight:700;text-transform:uppercase">Custom</span>` : html`<span style="font-size:9px;color:#999;text-transform:uppercase">Default</span>`}
+              </div>
+
+              ${managedList.map(function(url) {
+                var short = url.replace('wss://', '').replace(/\/$/, '')
+                return html`
+                  <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f0f0f0">
+                    <div style="flex:1;font-family:Consolas,monospace;font-size:11px;color:#555">${short}</div>
+                    <a
+                      href="javascript:void(0)"
+                      onclick="${function(e) { e.preventDefault(); removeRelay(url) }}"
+                      style="font-size:10px;color:#d9534f;text-decoration:none;font-weight:700;padding:2px 6px"
+                    >\u2715</a>
+                  </div>
+                `
+              })}
+
+              <div style="display:flex;gap:6px;margin-top:10px">
+                <input
+                  type="text"
+                  placeholder="wss://relay.example.com/"
+                  value="${mgmt.newUrl}"
+                  oninput="${function(e) { mgmt.newUrl = e.target.value }}"
+                  onkeydown="${function(e) { if (e.key === 'Enter') addRelay(mgmt.newUrl) }}"
+                  style="flex:1;padding:5px 8px;border:1px solid #ccc;border-radius:3px;font-size:11px;font-family:Consolas,monospace"
+                />
+                <button
+                  onclick="${function() { addRelay(mgmt.newUrl) }}"
+                  style="padding:5px 12px;background:#5cb85c;color:#fff;border:none;border-radius:3px;font-size:11px;font-weight:700;cursor:pointer"
+                >Add</button>
+              </div>
+
+              ${custom ? html`
+                <div style="margin-top:8px;text-align:right">
+                  <a
+                    href="javascript:void(0)"
+                    onclick="${function(e) { e.preventDefault(); resetDefaults() }}"
+                    style="font-size:10px;color:#999"
+                  >Reset to defaults</a>
+                </div>
+              ` : ''}
+
+              ${mgmt.dirty ? html`
+                <div style="margin-top:10px;padding:8px 10px;background:#fffff0;border:1px solid #cba;font-size:11px;color:#555;text-align:center">
+                  Relay list updated. <a href="javascript:void(0)" onclick="${function() { location.reload() }}" style="font-weight:700">Reload</a> to connect with new configuration.
+                </div>
+              ` : ''}
+            </div>
 
             <!-- How it works -->
             <div style="background:#fffff0;border:1px solid #cba;padding:12px 14px;margin-top:12px;font-size:11px;color:#555;line-height:1.6">

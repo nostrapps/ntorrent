@@ -60,13 +60,17 @@ a:hover { color: #d9534f; }
   var dataEl = document.getElementById('data')
   var statusEl = document.getElementById('nt-status')
 
-  var RELAYS = [
+  var DEFAULT_RELAYS = [
     'wss://nos.lol/',
     'wss://relay.damus.io/',
     'wss://nostr.mom/',
     'wss://relay.primal.net/',
     'wss://relay.mostr.pub/'
   ]
+
+  var saved = null
+  try { saved = JSON.parse(localStorage.getItem('ntorrent:relays')) } catch(e) {}
+  var RELAYS = Array.isArray(saved) && saved.length > 0 ? saved : DEFAULT_RELAYS
 
   var DEFAULT_TRACKERS = [
     'udp://tracker.opentrackr.org:1337',
@@ -217,6 +221,7 @@ a:hover { color: #d9534f; }
 
   // Expose for panes
   window.__NT_RELAYS = RELAYS
+  window.__NT_DEFAULT_RELAYS = DEFAULT_RELAYS
   window.__NT_DEFAULT_TRACKERS = DEFAULT_TRACKERS
   window.__NT_RELAY_STATS = relayStats
 
