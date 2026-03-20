@@ -1,13 +1,19 @@
 {
   "name": "ntorrent",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Nostr Torrent Browser — NIP-35 protocol demo built with LOSOS",
   "license": "AGPL-3.0-only",
+  "bin": {
+    "ntorrent": "./cli.js"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/nostrapps/ntorrent.git"
   },
   "homepage": "https://nostrapps.github.io/ntorrent/",
+  "dependencies": {
+    "ws": "^8.0.0"
+  },
   "keywords": [
     "nostr",
     "nip-35",
@@ -17,6 +23,7 @@
     "json-ld",
     "decentralized",
     "bittorrent",
-    "magnet"
+    "magnet",
+    "cli"
   ]
 }

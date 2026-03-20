@@ -24,8 +24,22 @@ This app is a pure frontend that reads those events. **It hosts nothing.** It's 
 
 📡 **Relays** — Live connection status, per-relay event counts, unique vs duplicate breakdown, latency, and dedup ratio.
 
+## CLI
+
+```
+npx ntorrent                      # list latest torrents
+npx ntorrent search "ubuntu"      # search by name
+npx ntorrent --cat audio          # filter by category
+npx ntorrent --cat video --magnet # magnet links only (pipeable)
+npx ntorrent --json               # JSON output
+npx ntorrent relays               # relay statistics
+```
+
+Options: `--cat <video|audio|game|software|other>`, `--magnet`, `--json`, `--limit <n>`, `--relay <url>`
+
 ## Quick Start
 
+**Browser:**
 ```
 git clone https://github.com/nostrapps/ntorrent.git
 cd ntorrent
@@ -33,24 +47,32 @@ python3 -m http.server 8080
 # open http://localhost:8080
 ```
 
-That's it. No `npm install`. No webpack. No React. Just files and a browser.
+**CLI:**
+```
+npm i -g ntorrent
+ntorrent search "linux"
+```
+
+No webpack. No React. Just files and a browser (or terminal).
 
 ## How It Works
 
 ```
-Browser                          Nostr Relays
+Browser / CLI                    Nostr Relays
   │                                  │
-  ├──WebSocket──→ wss://nos.lol     ─┤
-  ├──WebSocket──→ wss://relay.nostr.band ─┤  kind:2003
-  ├──WebSocket──→ wss://relay.damus.io   ─┤  torrent events
+  ├──WebSocket──→ wss://nos.lol         ─┤
+  ├──WebSocket──→ wss://relay.damus.io  ─┤  kind:2003
+  ├──WebSocket──→ wss://nostr.mom       ─┤  torrent events
+  ├──WebSocket──→ wss://relay.primal.net─┤
+  ├──WebSocket──→ wss://relay.mostr.pub ─┤
   │                                  │
   ▼                                  │
   JSON-LD ──→ LOSOS store ──→ DOM   │
   (6KB framework, surgical patches)  │
 ```
 
-1. Opens WebSocket connections to 3 Nostr relays
-2. Sends `["REQ", "browse", {"kinds": [2003], "limit": 200}]`
+1. Opens WebSocket connections to 5 Nostr relays (configurable)
+2. Sends `["REQ", "browse", {"kinds": [2003], "limit": 500}]`
 3. Receives torrent events, deduplicates by event ID
 4. Transforms to JSON-LD with schema.org vocabulary
 5. LOSOS renders the UI with tagged template literals — no virtual DOM, no diffing library
@@ -98,10 +120,13 @@ Zero dependencies. Zero build step. Copy the files and open in a browser.
 
 ```
 index.html          Main app — Nostr WebSocket client + JSON-LD bootstrap
+cli.js              CLI entry point (npx ntorrent)
+lib/nostr.js        Shared core — relay connection, event parsing, fetchTorrents()
+lib/format.js       CLI output formatting — tables, magnets, JSON, relay stats
 panes/browse.js     Search, filter, sort, detail view, magnet links
 panes/publish.js    xlogin auth, .torrent parser, magnet parser, auto-categorize
 panes/torrent.js    Stats dashboard — categories, timeline, metrics
-panes/relays.js     Relay status — connections, events, dedup
+panes/relays.js     Relay status — connections, events, dedup, relay management
 losos/              LOSOS framework (html.js, store.js, shell.js, registry.js)
 lion/               LION JSON-LD store
 og.png              Open Graph preview image
@@ -123,4 +148,4 @@ This is a read-only Nostr relay client for educational and research purposes. It
 
 ---
 
-Built with [LOSOS](https://losos.org) · Powered by [Nostr](https://nostr.com)
+Built with [LOSOS](https://losos.org) · Powered by [Nostr](https://nostr.com) · [did:nostr](https://nostrcg.github.io/did-nostr/)
