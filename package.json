@@ -1,6 +1,6 @@
 {
   "name": "ntorrent",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Nostr Torrent Browser — NIP-35 protocol demo built with LOSOS",
   "license": "AGPL-3.0-only",
   "bin": {
