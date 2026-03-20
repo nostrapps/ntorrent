@@ -9,6 +9,19 @@ var statusSymbols = {
   closed:     { icon: '\u26AA', label: 'Closed', color: '#999' }
 }
 
+function getRelays() {
+  // Read live stats if available, fall back to snapshot
+  var stats = window.__NT_RELAY_STATS
+  var relayUrls = window.__NT_RELAYS
+  if (stats && relayUrls) {
+    return relayUrls.map(function(url) {
+      var s = stats[url]
+      return { url: s.url, status: s.status, events: s.events, unique: s.unique, dupes: s.dupes, latencyMs: s.latencyMs, errors: s.errors }
+    })
+  }
+  return null
+}
+
 export default {
   label: 'Relays',
   icon: '\u{1F4E1}',
@@ -23,11 +36,14 @@ export default {
     var data = rawData
     var store = createStore(data, { debounce: 500 })
     var root = store.get('#this')
+    var pollTimer = null
 
     function renderRelays() {
-      var relayJson = store.prop(root, 'relayData')
-      var relays = []
-      try { relays = JSON.parse(relayJson) } catch(e) {}
+      var relays = getRelays()
+      if (!relays) {
+        var relayJson = store.prop(root, 'relayData')
+        try { relays = JSON.parse(relayJson) } catch(e) { relays = [] }
+      }
 
       var totalEvents = 0, totalUnique = 0, totalDupes = 0
       relays.forEach(function(r) {
@@ -145,20 +161,40 @@ export default {
               <b>Protocol:</b> Nostr (Notes and Other Stuff Transmitted by Relays)<br/>
               <b>NIP:</b> 35 (Torrent)<br/>
               <b>Event kind:</b> 2003 (torrent index), 2004 (torrent comment)<br/>
-              <b>Filter:</b> <code style="background:#f0f0f0;padding:1px 4px;border-radius:2px">{"kinds":[2003],"limit":200}</code><br/>
+              <b>Filter:</b> <code style="background:#f0f0f0;padding:1px 4px;border-radius:2px">{"kinds":[2003],"limit":500}</code><br/>
               <b>Transport:</b> WebSocket (wss://)
             </div>
 
             <div style="text-align:center;padding:16px 0;font-size:10px;color:#aaa">
-              NIP-35 \u2022 Nostr \u2022 <a href="https://losos.org" style="color:#999;font-size:10px">LOSOS</a>
+              NIP-35 \u2022 Nostr \u2022 <a href="https://losos.org" style="color:#999;font-size:10px">LOSOS</a> \u2022 <a href="https://nostrcg.github.io/did-nostr/" style="color:#999;font-size:10px">did:nostr</a>
             </div>
           </div>
         </div>
       `)
     }
 
+    // Poll live stats until all relays settle
+    function startPolling() {
+      pollTimer = setInterval(function() {
+        var stats = window.__NT_RELAY_STATS
+        if (!stats) { clearInterval(pollTimer); return }
+        var allSettled = true
+        var relayUrls = window.__NT_RELAYS || []
+        relayUrls.forEach(function(url) {
+          var s = stats[url]
+          if (s && (s.status === 'connecting' || s.status === 'connected')) allSettled = false
+        })
+        renderRelays()
+        if (allSettled) clearInterval(pollTimer)
+      }, 1000)
+    }
+
     var unsub = store.onChange(renderRelays)
     setTimeout(renderRelays, 0)
-    onUnmount(container, unsub)
+    startPolling()
+    onUnmount(container, function() {
+      unsub()
+      if (pollTimer) clearInterval(pollTimer)
+    })
   }
 }

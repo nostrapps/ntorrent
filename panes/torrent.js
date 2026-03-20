@@ -135,7 +135,7 @@ export default {
             </div>
 
             <div style="text-align:center;padding:16px 0;font-size:10px;color:#aaa">
-              NIP-35 \u2022 Nostr \u2022 <a href="https://losos.org" style="color:#999;font-size:10px">LOSOS</a>
+              NIP-35 \u2022 Nostr \u2022 <a href="https://losos.org" style="color:#999;font-size:10px">LOSOS</a> \u2022 <a href="https://nostrcg.github.io/did-nostr/" style="color:#999;font-size:10px">did:nostr</a>
             </div>
           </div>
         </div>

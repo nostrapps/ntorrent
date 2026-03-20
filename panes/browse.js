@@ -202,7 +202,7 @@ export default {
             ` : ''}
 
             <div style="text-align:center;padding:16px 0;font-size:10px;color:#aaa;border-top:1px solid #ddd;margin-top:8px">
-              NIP-35 protocol demo \u2022 <a href="https://losos.org" style="color:#999;font-size:10px">LOSOS</a>
+              NIP-35 protocol demo \u2022 <a href="https://losos.org" style="color:#999;font-size:10px">LOSOS</a> \u2022 <a href="https://nostrcg.github.io/did-nostr/" style="color:#999;font-size:10px">did:nostr</a>
             </div>
             <div style="text-align:center;padding:0 0 12px;font-size:10px;color:#888;max-width:500px;margin:0 auto;line-height:1.5">
               This is a read-only Nostr relay client for educational and research purposes. It displays publicly

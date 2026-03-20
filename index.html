@@ -61,9 +61,11 @@ a:hover { color: #d9534f; }
   var statusEl = document.getElementById('nt-status')
 
   var RELAYS = [
-    'wss://relay.nostr.band/',
     'wss://nos.lol/',
-    'wss://relay.damus.io/'
+    'wss://relay.damus.io/',
+    'wss://nostr.mom/',
+    'wss://relay.primal.net/',
+    'wss://relay.mostr.pub/'
   ]
 
   var DEFAULT_TRACKERS = [
@@ -187,7 +189,7 @@ a:hover { color: #d9534f; }
       rs.connectedAt = Date.now()
       rs.latencyMs = Date.now() - t0
       if (statusEl) statusEl.textContent = 'Connected to ' + connected + '/' + RELAYS.length + ' relays...'
-      ws.send(JSON.stringify(["REQ", "browse", { "kinds": [2003], "limit": 200 }]))
+      ws.send(JSON.stringify(["REQ", "browse", { "kinds": [2003], "limit": 500 }]))
     }
     ws.onmessage = function(e) {
       try {
@@ -216,6 +218,7 @@ a:hover { color: #d9534f; }
   // Expose for panes
   window.__NT_RELAYS = RELAYS
   window.__NT_DEFAULT_TRACKERS = DEFAULT_TRACKERS
+  window.__NT_RELAY_STATS = relayStats
 
   RELAYS.forEach(connectRelay)
   setTimeout(function() {
