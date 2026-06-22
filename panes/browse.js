@@ -49,7 +49,15 @@ export default {
     var store = createStore(data, { debounce: 500 })
     var root = store.get('#this')
 
-    var state = { search: '', category: '', sortBy: 'date', page: 0, pageSize: 50, selected: null }
+    var params = new URLSearchParams(location.search)
+    var state = { search: params.get('q') || '', category: '', sortBy: 'date', page: 0, pageSize: 50, selected: null }
+
+    function syncUrl() {
+      var url = new URL(location.href)
+      if (state.search) url.searchParams.set('q', state.search)
+      else url.searchParams.delete('q')
+      history.replaceState(null, '', url)
+    }
 
     function getCategories() {
       var torrents = store.propAll(root, 'torrent')
@@ -80,6 +88,7 @@ export default {
     }
 
     function renderApp() {
+      syncUrl()
       var allTorrents = store.propAll(root, 'torrent')
       var categories = getCategories()
       var filtered = getFiltered()
@@ -170,7 +179,11 @@ export default {
                   <div style="flex:1;padding:4px 8px;min-width:0">
                     <div style="font-size:12px;color:#1a0dab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400">${t.name}</div>
                     <div style="font-size:10px;color:#888;margin-top:1px">
-                      ${t.categories ? t.categories : ''} ${t.fileCount ? '\u2022 ' + t.fileCount + ' files' : ''}
+                      ${t.categories ? t.categories.split(',').map(function(c) {
+                        c = c.trim()
+                        if (!c) return ''
+                        return html`<a href="javascript:void(0)" onclick="${function(e) { e.stopPropagation(); state.search = c; state.page = 0; state.selected = null; renderApp() }}" style="color:#1a0dab;text-decoration:none;margin-right:4px" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${c}</a>`
+                      }) : ''} ${t.fileCount ? '\u2022 ' + t.fileCount + ' files' : ''}
                     </div>
                   </div>
                   <div style="width:80px;padding:6px 4px;text-align:center;border-left:1px solid #ddd;font-size:10px;color:#666">${fmtDate(t.created)}</div>
@@ -232,7 +245,11 @@ export default {
             <tr><td style="padding:2px 10px 2px 0;color:#888;font-weight:700">Size:</td><td>${formatSize(t.totalSize)}</td></tr>
             <tr><td style="padding:2px 10px 2px 0;color:#888;font-weight:700">Files:</td><td>${t.fileCount || 0}</td></tr>
             <tr><td style="padding:2px 10px 2px 0;color:#888;font-weight:700">Date:</td><td>${t.created ? new Date(t.created).toLocaleString() : '-'}</td></tr>
-            ${t.categories ? html`<tr><td style="padding:2px 10px 2px 0;color:#888;font-weight:700">Tags:</td><td>${t.categories}</td></tr>` : ''}
+            ${t.categories ? html`<tr><td style="padding:2px 10px 2px 0;color:#888;font-weight:700">Tags:</td><td>${t.categories.split(',').map(function(c) {
+              c = c.trim()
+              if (!c) return ''
+              return html`<a href="javascript:void(0)" onclick="${function(e) { e.stopPropagation(); state.search = c; state.page = 0; state.selected = null; renderApp() }}" style="color:#1a0dab;text-decoration:none;margin-right:6px" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${c}</a>`
+            })}</td></tr>` : ''}
             <tr><td style="padding:2px 10px 2px 0;color:#888;font-weight:700">Hash:</td><td style="font-family:Consolas,monospace;font-size:10px;word-break:break-all;color:#060">${t.infohash}</td></tr>
           </table>
 
