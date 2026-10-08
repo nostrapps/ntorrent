@@ -163,6 +163,11 @@ a:hover { color: #d9534f; }
     }
   }
 
+  // A search term in the URL also goes to the relays: as a '#t' tag filter (every relay indexes tags) and as a NIP-50
+  // 'search' for the relays that support it. Browsing the newest 500 alone finds nothing older than the mirror bots'
+  // last day or two; a listing tagged 'assumeutxo' from weeks ago is still one tag query away.
+  var SEARCH = (new URLSearchParams(location.search).get('q') || '').trim()
+  var SEARCH_TAGS = SEARCH.toLowerCase().split(/[\s,]+/).filter(function(t) { return t.length > 1 })
   var seen = {}, torrents = [], connected = 0, eoseCount = 0, booted = false
   var relayStats = {}
   RELAYS.forEach(function(r) { relayStats[r] = { url: r, status: 'connecting', events: 0, unique: 0, dupes: 0, connectedAt: 0, eoseAt: 0, latencyMs: 0, errors: 0 } })
@@ -193,7 +198,14 @@ a:hover { color: #d9534f; }
       rs.connectedAt = Date.now()
       rs.latencyMs = Date.now() - t0
       if (statusEl) statusEl.textContent = 'Connected to ' + connected + '/' + RELAYS.length + ' relays...'
+      rs.pending = { browse: true }
       ws.send(JSON.stringify(["REQ", "browse", { "kinds": [2003], "limit": 500 }]))
+      if (SEARCH_TAGS.length) {
+        rs.pending.tags = true
+        ws.send(JSON.stringify(["REQ", "tags", { "kinds": [2003], "#t": SEARCH_TAGS, "limit": 200 }]))
+        rs.pending.search = true
+        ws.send(JSON.stringify(["REQ", "search", { "kinds": [2003], "search": SEARCH, "limit": 100 }]))
+      }
     }
     ws.onmessage = function(e) {
       try {
@@ -206,11 +218,14 @@ a:hover { color: #d9534f; }
             var t = parseEvent(msg[2])
             if (t) { torrents.push(t); if (statusEl) statusEl.textContent = torrents.length + ' torrents found...' }
           } else { rs.dupes++ }
-        } else if (msg[0] === 'EOSE') {
-          rs.status = 'done'
-          rs.eoseAt = Date.now()
-          eoseCount++
-          if (eoseCount >= connected) boot()
+        } else if (msg[0] === 'EOSE' || msg[0] === 'CLOSED') {
+          delete rs.pending[msg[1]]
+          if (Object.keys(rs.pending).length === 0 && rs.status === 'connected') {
+            rs.status = 'done'
+            rs.eoseAt = Date.now()
+            eoseCount++
+            if (eoseCount >= connected) boot()
+          }
         }
       } catch(err) {}
     }

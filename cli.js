@@ -81,7 +81,7 @@ function progress(ev) {
   }
 }
 
-var fetchOpts = { limit: limit, onProgress: progress }
+var fetchOpts = { limit: limit, onProgress: progress, search: query }
 if (customRelays.length > 0) fetchOpts.relays = customRelays
 
 nostr.fetchTorrents(fetchOpts).then(function(result) {
